@@ -287,7 +287,23 @@ router.get('/buscarPorRestaurante', async (req, res) => {
         });
 
 });
+router.get('/buscarPromociones', async (req, res) => {
 
+    Promociones.find()
+        .then((losNodos) => {
+            res.json({
+                "status": "ok",
+                "Promociones": losNodos
+            });
+        })
+        .catch((err) => {
+            res.json({
+                "status": "fail",
+                "error": err
+            });
+        });
+
+});
 
 
 
