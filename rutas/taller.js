@@ -5,16 +5,18 @@ let Promociones = require('../esquemas/promociones.js');
 
 
 
-// Punto 1 consultar promociones vigentes y no caducan aun 
-router.get('/consultaPromVigente', async (req, res) => {
+
+
+//REQ 1 Obtener todas las promociones vigentes (que no han cumplido su fecha de expiración) PENDIENTE
+router.get('/obtenerPromocionesVigentes', async (req, res) => {
     let fechaActual = new Date();
-    Promociones.find({fechaInactivar : {$gt: new Date(fechaActual)}})
-        .then((promo) => {
-            
+    Promociones.find({fechaInactivar : {$gt: new Date(fechaActual)}}).sort({fechaInactivar:1})
+        .then((LasPromociones) => {
+                     
            res.json({
                 "status": "ok",
-                "nodo":promo
-               });
+                "nodo":LasPromociones
+            });
         })
         .catch((err) => {
             res.json({
@@ -24,16 +26,21 @@ router.get('/consultaPromVigente', async (req, res) => {
         });
 });
 
-//Punto 2 consultar las cinco promociones Premium más recientes 
-router.get('/PromPremium', async (req, res) => {
+//REQ 2 Obtener las cinco promociones Premium más recientes LISTO
+router.get('/obtenerPromocionesPremium', async (req, res) => {
 
-    Promociones.find({premium:true}).limit(5)
-    .then((Prom) => {
-        
-        
+    Promociones.find({premium:true}).sort({premium:1}).limit(5)
+    .then((LasPromociones) => {
+        sumatoria = null;
+            for(i=0; i < LasPromociones.length; i++){
+            if(LasPromociones[i].premium === true){
+                sumatoria = sumatoria +1;
+            }
+            }
        res.json({
             "status": "ok",
-            "nodo":Prom
+            "Registros":sumatoria,
+            "nodo":LasPromociones
 
         });
     })
@@ -47,16 +54,16 @@ router.get('/PromPremium', async (req, res) => {
 });
 
 
-//Punto 3 consultar promociones próximas a expirar, se debe formatear la busqueda
-router.get('/PromocionesExpirar', async (req, res) => {
+//REQ 3 Obtener las promociones próximas a expirar (usted define el criterio de proximidad) FALTANTE 
+router.get('/obtenerPromocionesPoExpirar/:cantidad', async (req, res) => {
     let fechaActual = new Date();
-    /*let cantidad = req.params.cantidad; */
-    Promociones.find({fechaInactivar : {$gt: new Date(fechaActual)}}).limit(cantidad)
-        .then((Prom) => {
+    let cantidad = parseInt(req.params.cantidad); 
+    Promociones.find({fechaInactivar : {$gt: new Date(fechaActual)},activo:true}).sort({fechaInactivar:1}).limit(cantidad)
+        .then((LasPromociones) => {
             
            res.json({
                 "status": "ok",
-                "nodo":Prom
+                "nodo":LasPromociones
             });
         })
         .catch((err) => {
@@ -68,21 +75,21 @@ router.get('/PromocionesExpirar', async (req, res) => {
 
 });
 
-//Punto 4 Obtener toda la información de una promoción en particular, incluyendo al restaurante LISTO
-router.get('/infoPromocion', async (req, res) => {
+//REQ 4 Obtener toda la información de una promoción en particular, incluyendo al restaurante LISTO
+router.get('/obtenerInfounaPromocionConSuRestaurante/:id', async (req, res) => {
     let idTarget = req.params.id;
     Promociones.findById(idTarget)
         .then((promo) => {
             
             Restaurantes.findById(promo.idRestaurante)
-            .then((Restau) => {
+            .then((Restaurant) => {
 
                 let PromocionTarget = promo.toObject();               
             
             res.json({
                 "status": "ok",
-                Restaurante: Restau,
-                Promocion: PromocionTarget
+                Promocion: PromocionTarget,
+                Restaurante: Restaurant
                 
             });
         })
@@ -95,19 +102,22 @@ router.get('/infoPromocion', async (req, res) => {
     });
 });
 
-
-//Punto 5 Obtener todas las promociones de un mismo restaurante
-router.get('/PromMismoRestaurante', async (req, res) => {
+//REQ 5 Obtener todas las promociones de un mismo restaurante LISTO
+router.get('/obtenerPromocionesMismoRestaurante/:id', async (req, res) => {
     let idTarget = req.params.id;
     Promociones.find({idRestaurante:idTarget})
-        .then((Promo) => {
+        .then((LasPromociones) => {
 
+            Restaurantes.findById(idTarget)
+            .then((Restaurant) => {
+ 
             res.json({
                 "status": "ok",
-                "Nodo": Promo
-
-                
+                "Nodo": LasPromociones,
+                "Restaurante":Restaurant
+   
             });
+        })
         })
         .catch((err) => {
             res.json({
@@ -118,13 +128,12 @@ router.get('/PromMismoRestaurante', async (req, res) => {
 
 });
 
-
-//Punto 6 Crear un nuevo restaurante de pautas 
-router.post('/nuevoRestaurante', async (req, res) => {
+//REQ 6 Crear un nuevo restaurante de pautas LISTO
+router.post('/crearNuevoRestaurante', async (req, res) => {
     let miNuevoRestaurante = new Restaurantes({
         nombre: req.body.nombre,
-        direccion: req.body.direccion,
-        estado : req.body.estado
+        direccion: req.body.direccion
+       
     });
 
     miNuevoRestaurante.save()
@@ -142,16 +151,14 @@ router.post('/nuevoRestaurante', async (req, res) => {
         });
 });
 
-
-//Punto 7 Crear una nueva promoción y vincularla con uno de los restaurantes existentes 
+//REQ 7 Crear una nueva promoción y vincularla con uno de los restaurantes existentes LISTO
 router.post('/crearPromocion', async (req, res) => {
     let miNuevoPromocion = new Promociones({
-        titulo: req.body.titulo,
-        contenido: req.body.contenido,
+        nombre: req.body.nombre,
+        carta: req.body.carta,
         premium: req.body.premium,
-        estado: req.body.estado,
-        fechaInicial: req.body.fechaInicial,
-        fechaExpiracion: req.body.fechaExpiracion,
+        activo: req.body.activo,
+        fechaInactivar: req.body.fechaInactivar,
         idRestaurante: req.body.idRestaurante
     });
 
@@ -170,8 +177,29 @@ router.post('/crearPromocion', async (req, res) => {
         });
 });
 
-//Punto 8 Actualizar un solo campo a la vez de promociones LISTO
-router.put('/actualizarPromo', async (req, res) => {
+//REQ 8 Actualizar un solo campo a la vez de restaurantes LISTO
+router.put('/actualizarDatoDeUnRestaurante/:id', async (req, res) => {
+
+    Restaurantes.findByIdAndUpdate(req.params.id,
+        req.body.queryUpdate)
+        .then(() => {
+            res.json({
+                "status": "ok",
+
+        });
+        })
+        .catch((err) => {
+            res.json({
+                "status": "fail",
+                "error": err
+            });
+        });
+
+
+});
+
+//REQ 8 Actualizar un solo campo a la vez de promociones LISTO
+router.put('/actualizarUnDatoDePromo/:id', async (req, res) => {
 
     Promociones.findByIdAndUpdate(req.params.id,
         req.body.queryUpdate)
@@ -191,11 +219,10 @@ router.put('/actualizarPromo', async (req, res) => {
 
 });
 
-
-//punto 9 Desactivar (o eliminar) una promoción existente
-router.put('/desactivar', async (req, res) => {
-
-    Restaurantes.update({id: req.params.id },{$set: { estado : false } })
+//Desactivar (o eliminar) una restaurante existente
+router.put('/desactivarRestaurante/:id', async (req, res) => {
+    let idTarget = req.params.id;
+    Restaurantes.findByIdAndUpdate(idTarget,{ activo : false })
         .then(() => {
             res.json({
                 "status": "ok",
@@ -212,65 +239,27 @@ router.put('/desactivar', async (req, res) => {
 
 });
 
-
-
-
-
-
-
-
-
-
-
-router.post('/crearRestaurante', async (req, res) => {
-    let miNuevoRestaurante = new Restaurantes({
-        nombre: req.body.nombre,
-        direccion: req.body.direccion,
-        estado : req.body.estado
-    });
-
-    miNuevoRestaurante.save()
-        .then((nodo) => {
+//Desactivar (o eliminar) una promoción existente
+router.put('/desactivarPromocion/:id', async (req, res) => {
+    Promociones.findByIdAndUpdate(idTarget,{ activo : false })
+        .then(() => {
             res.json({
-                status: "ok",
-                nodoCreado: nodo
-            });
+                "status": "ok",
+
+        });
         })
         .catch((err) => {
             res.json({
-                status: "fail",
-                error: err
+                "status": "fail",
+                "error": err
             });
         });
 });
 
-router.post('/crearPromocion', async (req, res) => {
-    let miNuevaPromocion = new Promociones({
-        nombre:req.body.nombre,
-        carta: req.body.carta,
-        premium: req.body.premium,
-        activo: req.body.activo,
-        fechaInactivar: req.body.fechaInactivar,
-        idRestaurante: req.body.idRestaurante
-    });
-
-    miNuevaPromocion.save()
-        .then((nodo) => {
-            res.json({
-                status: "ok",
-                nodoCreado: nodo
-            });
-        })
-        .catch((err) => {
-            res.json({
-                status: "fail",
-                error: err
-            });
-        });  
-});
 
 
-router.get('/buscarPorRestaurante', async (req, res) => {
+//Obtener todos los restaurantes
+router.get('/obtenerTodosLosRestaurantes', async (req, res) => {
 
     Restaurantes.find()
         .then((losNodos) => {
@@ -288,12 +277,11 @@ router.get('/buscarPorRestaurante', async (req, res) => {
 
 });
 router.get('/buscarPromociones', async (req, res) => {
-
-    Promociones.find()
+      Promociones.find()
         .then((losNodos) => {
             res.json({
                 "status": "ok",
-                "Promociones": losNodos
+                "Promo": losNodos
             });
         })
         .catch((err) => {
@@ -304,7 +292,7 @@ router.get('/buscarPromociones', async (req, res) => {
         });
 
 });
-
+    
 
 
 
